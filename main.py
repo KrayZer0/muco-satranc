@@ -20,11 +20,11 @@ app.add_middleware(
 board = chess.Board()
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# SİSTEME GÖRE MOTOR YOLUNU OTOMATİK AYARLAMA
+# SİSTEMDE HAZIR MOTOR VAR MI DİYE KONTROL EDİLİYOR
 if os.name == 'nt':  # Windows
     stockfish_path = os.path.join(current_dir, "stockfish.exe")
 else:  # Linux (Render)
-    # Önce sistemde hazır kurulu bir stockfish var mı diye bak
+    # Sistem yollarını kontrol et, yoksa varsayılanı bırak
     stockfish_path = shutil.which("stockfish") or "/usr/games/stockfish"
 
 class MoveInput(BaseModel):
@@ -53,23 +53,22 @@ def make_move(data: MoveInput):
             board.push(move)
             
             if not board.is_game_over():
-                # Render Linux üzerinde çalışırken stockfish kütüphanesini doğrudan entegre ediyoruz
                 if os.name != 'nt':
                     try:
+                        # HATA ALAN YER BURASIYDI: Kütüphaneyi ham parametreyle başlatıyoruz
                         from stockfish import Stockfish
-                        # Eğer sistem yolu çalışmazsa doğrudan kütüphanenin kendisini çağırıyoruz
-                        sf = Stockfish()
+                        sf = Stockfish(path=None) # Herhangi bir dış dosyaya bağımlı kalma, kendi içindekini kullan!
                         sf.set_fen_position(board.fen())
                         best_move_str = sf.get_best_move()
                         ai_move = chess.Move.from_uci(best_move_str)
-                    except Exception as e_inner:
-                        # Kütüphane yöntemi de yemezse standart engine'e geri dön
+                    except Exception:
+                        # Eğer kütüphane yöntemi yine de bulamazsa standart satranç motoruyla dene
                         engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
                         result = engine.play(board, chess.engine.Limit(time=0.1))
                         ai_move = result.move
                         engine.quit()
                 else:
-                    # Windows yerel makine için standart çalışma şekli
+                    # Windows (Lokal makinen için)
                     engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
                     result = engine.play(board, chess.engine.Limit(time=0.1))
                     ai_move = result.move
