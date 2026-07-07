@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Müco Satranç - Yapay Zeka</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+    
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -49,5 +51,58 @@
         const BACKEND_URL = "https://satranc-backendd.onrender.com";
 
         function onDragStart (source, piece, position, orientation) {
-            // Oyun bittiyse veya siyah taş hareket ettirilmeye çalışılıyorsa engelle
-            if (piece.search(/^b/) !== -1)
+            if (piece.search(/^b/) !== -1) return false;
+        }
+
+        async function onDrop (source, target, piece, newPos, oldPos, orientation) {
+            if (source === target) return;
+
+            document.getElementById('status').innerText = "Yapay zeka düşünüyor...";
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/hamle-yap`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source: source, target: target })
+                });
+
+                const data = await response.json();
+
+                if (data.durum === 'basarili') {
+                    board.move(`${data.kaynak}-${data.hedef}`);
+                    document.getElementById('status').innerText = "Senin sıran (Beyazlar)";
+                } else if (data.durum === 'oyun_bitti') {
+                    document.getElementById('status').innerText = "Oyun bitti! " + data.mesaj;
+                } else {
+                    document.getElementById('status').innerText = "Hata: " + data.mesaj;
+                    return 'snapback';
+                }
+            } catch (error) {
+                console.error("Bağlantı hatası:", error);
+                document.getElementById('status').innerText = "Bağlantı hatası! Sunucu uyanıyor olabilir, tekrar dene.";
+                return 'snapback';
+            }
+        }
+
+        async function yeniOyun() {
+            try {
+                await fetch(`${BACKEND_URL}/sifirla`, { method: 'POST' });
+                board.start();
+                document.getElementById('status').innerText = "Oyun sıfırlandı. Senin sıran!";
+            } catch (error) {
+                console.error("Sıfırlama hatası:", error);
+            }
+        }
+
+        var config = {
+            draggable: true,
+            position: 'start',
+            onDragStart: onDragStart,
+            onDrop: onDrop,
+            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+        };
+        
+        board = Chessboard('board', config);
+    </script>
+</body>
+</html>
