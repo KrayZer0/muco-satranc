@@ -20,11 +20,12 @@ board = chess.Board()
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Eğer Render (Linux) üzerindeysek sistemdeki stockfish'i kullan, Windows'taysak yerel exe'yi kullan
-if os.name == 'nt':  # Windows
+if os.name == 'nt':  # Windows'taysan lokal exe'yi kullan
     stockfish_path = os.path.join(current_dir, "stockfish.exe")
-else:  # Linux (Render)
-    stockfish_path = "/usr/games/stockfish"
+else:  # Render (Linux) üzerindeysek indirilen python paketinin yolunu otomatik bul
+    from stockfish import Stockfish
+    import shutil
+    stockfish_path = shutil.which("stockfish") or "/usr/games/stockfish"
 
 class MoveInput(BaseModel):
     source: str
