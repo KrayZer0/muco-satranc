@@ -3,116 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>müco31 Chess Pro</title>
+    <title>Müco Satranç - Yapay Zeka</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
-</head>
-<body style="background-color: #1e1e1e; color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0;">
-
-    <h1 style="margin-bottom: 5px; color: #4CAF50;">müco31 Satranç Gelişim Platformu</h1>
-    <p style="color: #aaa; margin-top: 0; margin-bottom: 20px;">Kilitlenmeyen Akıllı Satranç Motoru</p>
-    
-    <div id="board" style="width: 400px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border-radius: 4px; overflow: hidden;"></div>
-    <p id="status" style="font-size: 1.1rem; font-weight: bold; background: #333; padding: 10px 20px; border-radius: 20px; margin-top: 20px;">Sıra sizde (Beyazlar)</p>
-
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #262522;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 { margin-bottom: 10px; color: #f0d9b5; }
+        #board { width: 400px; margin: 20px auto; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        #status { font-size: 1.2rem; font-weight: bold; margin-top: 10px; min-height: 30px; color: #b5996f; }
+        .btn {
+            background-color: #b5996f;
+            color: #262522;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .btn:hover { background-color: #f0d9b5; }
+    </style>
+</head>
+<body>
+
+    <h1>Müco Satranç vs Stockfish</h1>
+    <div id="board"></div>
+    <div id="status">Senin sıran (Beyazlar)</div>
+    <button class="btn" onclick="yeniOyun()">Oyunu Sıfırla</button>
 
     <script>
-        var game = new Chess();
         var board = null;
+        // Render'dan aldığın güncel canlı backend linki
+        const BACKEND_URL = "https://satranc-backendd.onrender.com";
 
         function onDragStart (source, piece, position, orientation) {
-            if (game.game_over()) return false;
-            if (piece.search(/^b/) !== -1) return false;
-        }
-
-        async function onDrop (source, target) {
-            // Hamlenin terfi içerip içermediğini kontrol et
-            var moves = game.moves({ target: target, verbose: true });
-            var isPromotion = false;
-
-            for (var i = 0; i < moves.length; i++) {
-                if (moves[i].from === source && moves[i].to === target && moves[i].promotion) {
-                    isPromotion = true;
-                    break;
-                }
-            }
-
-            var promotionPiece = null;
-            if (isPromotion) {
-                var choice = prompt("Piyon terfisi için harf girin:\nq: Vezir\nn: At\nr: Kale\nb: Fil", "q");
-                promotionPiece = (choice === 'q' || choice === 'n' || choice === 'r' || choice === 'b') ? choice : 'q';
-            }
-
-            // Oyuncunun hamlesini yap
-            var moveOptions = { from: source, to: target };
-            if (promotionPiece) moveOptions.promotion = promotionPiece;
-
-            var move = game.move(moveOptions);
-
-            // Kural dışıysa geri at
-            if (move === null) return 'snapback';
-
-            board.position(game.fen());
-            document.getElementById('status').innerText = "Yapay zeka düşünüyor...";
-
-            try {
-                const response = await fetch('https://satranc-backendd.onrender.com/hamle-yap', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        source: source, 
-                        target: target,
-                        promotion: promotionPiece
-                    })
-                });
-
-                const data = await response.json();
-                
-                if (data.durum === "basarili") {
-                    var botMoveOptions = {
-                        from: data.kaynak,
-                        to: data.hedef
-                    };
-                    
-                    // BOTUN TERFİ BİLGİSİNİ BURADA EKSİKSİZ ALIYORUZ VE MOTOR KİLİTLENMİYOR
-                    if (data.bot_promotion) {
-                        botMoveOptions.promotion = data.bot_promotion.trim();
-                    }
-
-                    var botMove = game.move(botMoveOptions);
-                    
-                    if (botMove === null) {
-                        console.error("Bot kural dışı hamle yapmaya çalıştı veya senkronizasyon koptu:", botMoveOptions);
-                        document.getElementById('status').innerText = "Hata: Bot hamlesi kural motoru tarafından reddedildi!";
-                    } else {
-                        board.position(game.fen());
-                        document.getElementById('status').innerText = "Bot hamle yaptı: " + data.kaynak + " -> " + data.hedef + ". Sıra sizde!";
-                    }
-                } else {
-                    document.getElementById('status').innerText = "Hata: " + data.mesaj;
-                }
-            } catch (error) {
-                console.error("Bağlantı hatası:", error);
-                document.getElementById('status').innerText = "Hata: Sunucuya bağlanılamadı!";
-            }
-        }
-
-        function onSnapEnd () {
-            board.position(game.fen());
-        }
-
-        var config = {
-            draggable: true,      
-            position: 'start',    
-            onDragStart: onDragStart, 
-            onDrop: onDrop,
-            onSnapEnd: onSnapEnd,      
-            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-        };
-
-        board = Chessboard('board', config);
-    </script>
-</body>
-</html>
+            // Oyun bittiyse veya siyah taş hareket ettirilmeye çalışılıyorsa engelle
+            if (piece.search(/^b/) !== -1)
